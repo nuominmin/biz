@@ -23,17 +23,24 @@ const (
 	contextKeyUserID         = "userID"
 )
 
-type Service struct {
+type Service interface {
+	NewSecret() ([]byte, error)
+	GenerateJWT(userId uint64, extra interface{}) (string, error)
+	Middleware(ignoredPaths ...string) middleware.Middleware
+	NewContextWithUserId(ctx context.Context, userId uint64) context.Context
+	GetUserId(ctx context.Context) (uint64, error)
+}
+type service struct {
 	secret []byte
 }
 
-func NewService(secret []byte) *Service {
-	return &Service{
+func NewService(secret []byte) Service {
+	return &service{
 		secret: secret,
 	}
 }
 
-func (s *Service) NewSecret() ([]byte, error) {
+func (s *service) NewSecret() ([]byte, error) {
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {
 		return nil, fmt.Errorf("failed to generate jwt, error: %v", err)
@@ -41,7 +48,7 @@ func (s *Service) NewSecret() ([]byte, error) {
 	return secret, nil
 }
 
-func (s *Service) GenerateJWT(userId uint64, extra interface{}) (string, error) {
+func (s *service) GenerateJWT(userId uint64, extra interface{}) (string, error) {
 	now := time.Now()
 	claims := jwt.MapClaims{
 		contextKeyUserID: userId,
@@ -53,7 +60,7 @@ func (s *Service) GenerateJWT(userId uint64, extra interface{}) (string, error) 
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(s.secret)
 }
 
-func (s *Service) Middleware(ignoredPaths ...string) middleware.Middleware {
+func (s *service) Middleware(ignoredPaths ...string) middleware.Middleware {
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 			var tokenString string
@@ -105,11 +112,11 @@ func (s *Service) Middleware(ignoredPaths ...string) middleware.Middleware {
 	}
 }
 
-func (s *Service) NewContextWithUserId(ctx context.Context, userId uint64) context.Context {
+func (s *service) NewContextWithUserId(ctx context.Context, userId uint64) context.Context {
 	return context.WithValue(ctx, contextKeyUserID, userId)
 }
 
-func (s *Service) GetUserId(ctx context.Context) (uint64, error) {
+func (s *service) GetUserId(ctx context.Context) (uint64, error) {
 	value := ctx.Value(contextKeyUserID)
 	if userId, ok := value.(uint64); ok {
 		return userId, nil

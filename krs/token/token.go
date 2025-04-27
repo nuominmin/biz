@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/transport"
 	"github.com/google/uuid"
-	"strings"
 )
 
 const (
@@ -18,18 +19,23 @@ const (
 	contextKeyToken          = "token"
 )
 
-type Service struct {
+type Service interface {
+	GenerateToken() string
+	Middleware(ignoredPaths []string, m ...middleware.Middleware) middleware.Middleware
+	GetToken(ctx context.Context) (string, error)
 }
 
-func NewService() *Service {
-	return &Service{}
+type service struct{}
+
+func NewService() Service {
+	return &service{}
 }
 
-func (s *Service) GenerateToken() string {
+func (s *service) GenerateToken() string {
 	return strings.ReplaceAll(uuid.New().String(), "-", "")
 }
 
-func (s *Service) Middleware(ignoredPaths []string, m ...middleware.Middleware) middleware.Middleware {
+func (s *service) Middleware(ignoredPaths []string, m ...middleware.Middleware) middleware.Middleware {
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 			var tokenString string
@@ -72,11 +78,11 @@ func (s *Service) Middleware(ignoredPaths []string, m ...middleware.Middleware) 
 	}
 }
 
-func (s *Service) newContextWithToken(ctx context.Context, token string) context.Context {
+func (s *service) newContextWithToken(ctx context.Context, token string) context.Context {
 	return context.WithValue(ctx, contextKeyToken, token)
 }
 
-func (s *Service) GetToken(ctx context.Context) (string, error) {
+func (s *service) GetToken(ctx context.Context) (string, error) {
 	if token, ok := ctx.Value(contextKeyToken).(string); ok {
 		return token, nil
 	}
