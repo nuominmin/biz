@@ -1,4 +1,4 @@
-module github/nuominmin/biz
+module github/nuominmin/biz/captcha
 
 go 1.24.1
 
