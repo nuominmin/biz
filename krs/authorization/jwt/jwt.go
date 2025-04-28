@@ -12,15 +12,12 @@ import (
 
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/transport"
+	"github.com/nuominmin/biz/krs/authorization"
 	"github.com/spf13/cast"
 )
 
 const (
-	HeaderAuthorizationKey   = "Authorization"
-	AuthorizationValueBearer = "Bearer"
-	ErrMissingToken          = "missing token"
-	ErrInvalidToken          = "invalid token"
-	contextKeyUserID         = "userID"
+	contextKeyUserId = "user_id"
 )
 
 type Service interface {
@@ -51,7 +48,7 @@ func (s *service) NewSecret() ([]byte, error) {
 func (s *service) GenerateJWT(userId uint64, extra interface{}) (string, error) {
 	now := time.Now()
 	claims := jwt.MapClaims{
-		contextKeyUserID: userId,
+		contextKeyUserId: userId,
 		"exp":            now.Add(time.Hour * 24 * 30).Unix(),
 		"iat":            now.Unix(),
 		"extra":          extra,
@@ -76,69 +73,50 @@ func (s *service) Middleware(ignoredPaths ...string) middleware.Middleware {
 					}
 				}
 
-				authHeader := tr.RequestHeader().Get(HeaderAuthorizationKey)
+				authHeader := tr.RequestHeader().Get(authorization.HeaderAuthorizationKey)
 				if authHeader == "" {
-					return nil, NewAuthorizationError(ErrMissingToken)
+					return nil, authorization.NewAuthorizationError(authorization.ErrMissingToken)
 				}
 
 				parts := strings.SplitN(authHeader, " ", 2)
-				if len(parts) != 2 || parts[0] != AuthorizationValueBearer {
-					return nil, NewAuthorizationError(ErrInvalidToken)
+				if len(parts) != 2 || parts[0] != authorization.AuthorizationValueBearer {
+					return nil, authorization.NewAuthorizationError(authorization.ErrInvalidToken)
 				}
 
 				tokenString = parts[1]
 			} else {
-				return nil, NewAuthorizationError(ErrMissingToken)
+				return nil, authorization.NewAuthorizationError(authorization.ErrMissingToken)
 			}
 
 			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, NewAuthorizationError(ErrInvalidToken)
+					return nil, authorization.NewAuthorizationError(authorization.ErrInvalidToken)
 				}
 				return s.secret, nil
 			})
 
 			if err != nil || !token.Valid {
-				return nil, NewAuthorizationError(ErrInvalidToken)
+				return nil, authorization.NewAuthorizationError(authorization.ErrInvalidToken)
 			}
 
 			claims, ok := token.Claims.(jwt.MapClaims)
 			if !ok {
-				return nil, NewAuthorizationError(ErrInvalidToken)
+				return nil, authorization.NewAuthorizationError(authorization.ErrInvalidToken)
 			}
 
-			return handler(s.NewContextWithUserId(ctx, cast.ToUint64(claims[contextKeyUserID])), req)
+			return handler(s.NewContextWithUserId(ctx, cast.ToUint64(claims[contextKeyUserId])), req)
 		}
 	}
 }
 
 func (s *service) NewContextWithUserId(ctx context.Context, userId uint64) context.Context {
-	return context.WithValue(ctx, contextKeyUserID, userId)
+	return context.WithValue(ctx, contextKeyUserId, userId)
 }
 
 func (s *service) GetUserId(ctx context.Context) (uint64, error) {
-	value := ctx.Value(contextKeyUserID)
+	value := ctx.Value(contextKeyUserId)
 	if userId, ok := value.(uint64); ok {
 		return userId, nil
 	}
 	return 0, errors.New("failed to get user Id from context")
-}
-
-type AuthorizationError struct {
-	Code    int
-	Message string
-}
-
-func (e *AuthorizationError) Error() string {
-	return fmt.Sprintf(`{"code": %d, "message": "%s"}`, e.Code, e.Message)
-}
-
-func NewAuthorizationError(format string, a ...any) *AuthorizationError {
-	if format == "" {
-		format = "Unauthorized"
-	}
-	return &AuthorizationError{
-		Code:    401,
-		Message: fmt.Sprintf(format, a...),
-	}
 }

@@ -1,4 +1,4 @@
-module github.com/nuominmin/biz/krs/jwt
+module github.com/nuominmin/biz
 
 go 1.24.1
 

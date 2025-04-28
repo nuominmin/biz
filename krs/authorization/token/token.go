@@ -3,20 +3,19 @@ package token
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/transport"
 	"github.com/google/uuid"
+	"github.com/nuominmin/biz/krs/authorization"
 )
 
+// contextKey is a custom type to avoid collisions in context keys.
+type contextKey string
+
 const (
-	HeaderAuthorizationKey   = "Authorization"
-	AuthorizationValueBearer = "Bearer"
-	ErrMissingToken          = "missing token"
-	ErrInvalidToken          = "invalid token"
-	contextKeyToken          = "token"
+	contextKeyToken contextKey = "token"
 )
 
 type Service interface {
@@ -51,19 +50,19 @@ func (s *service) Middleware(ignoredPaths []string, m ...middleware.Middleware) 
 					}
 				}
 
-				authHeader := tr.RequestHeader().Get(HeaderAuthorizationKey)
+				authHeader := tr.RequestHeader().Get(authorization.HeaderAuthorizationKey)
 				if authHeader == "" {
-					return nil, NewAuthorizationError(ErrMissingToken)
+					return nil, authorization.NewAuthorizationError(authorization.ErrMissingToken)
 				}
 
 				parts := strings.SplitN(authHeader, " ", 2)
-				if len(parts) != 2 || parts[0] != AuthorizationValueBearer {
-					return nil, NewAuthorizationError(ErrInvalidToken)
+				if len(parts) != 2 || parts[0] != authorization.AuthorizationValueBearer {
+					return nil, authorization.NewAuthorizationError(authorization.ErrInvalidToken)
 				}
 
 				tokenString = parts[1]
 			} else {
-				return nil, NewAuthorizationError(ErrMissingToken)
+				return nil, authorization.NewAuthorizationError(authorization.ErrMissingToken)
 			}
 
 			// 将 token 信息传递给 handler
@@ -87,23 +86,4 @@ func (s *service) GetToken(ctx context.Context) (string, error) {
 		return token, nil
 	}
 	return "", errors.New("failed to token from context")
-}
-
-type AuthorizationError struct {
-	Code    int
-	Message string
-}
-
-func (e *AuthorizationError) Error() string {
-	return fmt.Sprintf(`{"code": %d, "message": "%s"}`, e.Code, e.Message)
-}
-
-func NewAuthorizationError(format string, a ...any) *AuthorizationError {
-	if format == "" {
-		format = "Unauthorized"
-	}
-	return &AuthorizationError{
-		Code:    401,
-		Message: fmt.Sprintf(format, a...),
-	}
 }
