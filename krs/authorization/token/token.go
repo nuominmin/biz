@@ -11,11 +11,9 @@ import (
 	"github.com/nuominmin/biz/krs/authorization"
 )
 
-// contextKey is a custom type to avoid collisions in context keys.
-type contextKey string
-
 const (
-	contextKeyToken contextKey = "token"
+	// default context key for token
+	defaultContextKey string = "token"
 )
 
 type Service interface {
@@ -24,10 +22,21 @@ type Service interface {
 	GetToken(ctx context.Context) (string, error)
 }
 
-type service struct{}
+type service struct {
+	contextKey string
+}
 
 func NewService() Service {
-	return &service{}
+	return &service{
+		contextKey: defaultContextKey,
+	}
+}
+
+// NewServiceWithContextKey creates a new token service with a custom context key.
+func NewServiceWithContextKey(contextKey string) Service {
+	return &service{
+		contextKey: contextKey,
+	}
 }
 
 func (s *service) GenerateToken() string {
@@ -78,11 +87,11 @@ func (s *service) Middleware(ignoredPaths []string, m ...middleware.Middleware) 
 }
 
 func (s *service) newContextWithToken(ctx context.Context, token string) context.Context {
-	return context.WithValue(ctx, contextKeyToken, token)
+	return context.WithValue(ctx, s.contextKey, token)
 }
 
 func (s *service) GetToken(ctx context.Context) (string, error) {
-	if token, ok := ctx.Value(contextKeyToken).(string); ok {
+	if token, ok := ctx.Value(s.contextKey).(string); ok {
 		return token, nil
 	}
 	return "", errors.New("failed to token from context")

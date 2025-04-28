@@ -17,23 +17,34 @@ import (
 )
 
 const (
-	contextKeyUserId = "user_id"
+	// default context key for user_id
+	defaultContextKey = "user_id"
 )
 
 type Service interface {
 	NewSecret() ([]byte, error)
-	GenerateJWT(userId uint64, extra interface{}) (string, error)
+	GenerateJWT(userId uint64, extra any) (string, error)
 	Middleware(ignoredPaths ...string) middleware.Middleware
 	NewContextWithUserId(ctx context.Context, userId uint64) context.Context
 	GetUserId(ctx context.Context) (uint64, error)
 }
 type service struct {
-	secret []byte
+	contextKey string
+	secret     []byte
 }
 
 func NewService(secret []byte) Service {
 	return &service{
-		secret: secret,
+		contextKey: defaultContextKey,
+		secret:     secret,
+	}
+}
+
+// NewServiceWithContextKey creates a new JWT service with a custom context key.
+func NewServiceWithContextKey(secret []byte, contextKey string) Service {
+	return &service{
+		contextKey: contextKey,
+		secret:     secret,
 	}
 }
 
@@ -45,13 +56,13 @@ func (s *service) NewSecret() ([]byte, error) {
 	return secret, nil
 }
 
-func (s *service) GenerateJWT(userId uint64, extra interface{}) (string, error) {
+func (s *service) GenerateJWT(userId uint64, extra any) (string, error) {
 	now := time.Now()
 	claims := jwt.MapClaims{
-		contextKeyUserId: userId,
-		"exp":            now.Add(time.Hour * 24 * 30).Unix(),
-		"iat":            now.Unix(),
-		"extra":          extra,
+		s.contextKey: userId,
+		"exp":        now.Add(time.Hour * 24 * 30).Unix(),
+		"iat":        now.Unix(),
+		"extra":      extra,
 	}
 
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(s.secret)
@@ -104,17 +115,17 @@ func (s *service) Middleware(ignoredPaths ...string) middleware.Middleware {
 				return nil, authorization.NewAuthorizationError(authorization.ErrInvalidToken)
 			}
 
-			return handler(s.NewContextWithUserId(ctx, cast.ToUint64(claims[contextKeyUserId])), req)
+			return handler(s.NewContextWithUserId(ctx, cast.ToUint64(claims[s.contextKey])), req)
 		}
 	}
 }
 
 func (s *service) NewContextWithUserId(ctx context.Context, userId uint64) context.Context {
-	return context.WithValue(ctx, contextKeyUserId, userId)
+	return context.WithValue(ctx, s.contextKey, userId)
 }
 
 func (s *service) GetUserId(ctx context.Context) (uint64, error) {
-	value := ctx.Value(contextKeyUserId)
+	value := ctx.Value(s.contextKey)
 	if userId, ok := value.(uint64); ok {
 		return userId, nil
 	}
