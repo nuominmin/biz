@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github/nuominmin/biz/captcha"
 	"strings"
+
+	"github.com/nuominmin/biz/captcha"
 )
 
 func main() {
