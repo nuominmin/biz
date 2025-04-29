@@ -9,13 +9,18 @@ const (
 	minPageSize     = 1   // 最小每页数量
 )
 
-// PageReq 代表分页请求参数
+// 代表分页请求参数
 type PageReq struct {
 	Page     uint `form:"page" json:"page"`
 	PageSize uint `form:"page_size" json:"page_size"`
 }
 
-// Sanitize 处理 PageSize 的默认值、最小值和最大值
+// Sanitize 对分页请求参数进行合法性校验与修正
+// 根据传入的可选参数（Option）来设置默认页大小和最大页大小，
+// 并对 Page 和 PageSize 参数进行以下处理：
+// 1. 如果 Page 小于允许的最小页码（minPage），则设置为默认页码（defaultPage）
+// 2. 如果 PageSize 小于允许的最小页大小（minPageSize），则设置为默认页大小（defaultPageSize）
+// 3. 如果 PageSize 大于允许的最大页大小（maxPageSize），则设置为最大页大小（maxPageSize）
 func (p *PageReq) Sanitize(opts ...Option) {
 	options := newOptions(opts...)
 
@@ -36,16 +41,11 @@ func (p *PageReq) Sanitize(opts ...Option) {
 	}
 }
 
-// Offset 计算偏移量
+// 计算偏移量
 func (p *PageReq) Offset() uint {
 	if p.Page <= 0 || p.PageSize <= 0 {
 		p.Sanitize()
 	}
 
 	return (p.Page - 1) * p.PageSize
-}
-
-func (p *PageReq) Default() {
-	p.Page = defaultPage
-	p.PageSize = defaultPageSize
 }
