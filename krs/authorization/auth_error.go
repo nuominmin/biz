@@ -10,20 +10,20 @@ const (
 	errMessageUnauthorized = "Unauthorized"
 )
 
-type AuthorizationError struct {
+type Error struct {
 	Code    int
 	Message string
 }
 
-func (e *AuthorizationError) Error() string {
+func (e *Error) Error() string {
 	return fmt.Sprintf(errFormat, e.Code, e.Message)
 }
 
-func NewAuthorizationError(format string, a ...any) *AuthorizationError {
+func NewAuthorizationError(format string, a ...any) *Error {
 	if format == "" {
 		format = errMessageUnauthorized
 	}
-	return &AuthorizationError{
+	return &Error{
 		Code:    401,
 		Message: fmt.Sprintf(format, a...),
 	}
