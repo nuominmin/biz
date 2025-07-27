@@ -41,7 +41,7 @@ func ProductionCORS(allowedOrigins ...string) http.FilterFunc {
 	}
 	return handlers.CORS(
 		handlers.AllowedHeaders([]string{"X-Requested-With", "Content-Type", "Authorization", "User-Agent", "Content-Length", "Access-Control-Allow-Credentials"}),
-		handlers.AllowedMethods([]string{"GET", "POST", "PUT", "HEAD", "OPTIONS"}),
+		handlers.AllowedMethods([]string{"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"}),
 		handlers.AllowedOrigins([]string{"*"}),
 		handlers.AllowCredentials(),
 	)
