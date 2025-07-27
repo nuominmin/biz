@@ -3,17 +3,13 @@ package token
 import (
 	"context"
 	"errors"
+	"github.com/nuominmin/biz/krs/middleware/constant"
+	"github.com/nuominmin/biz/krs/middleware/errresp"
 	"strings"
 
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/transport"
 	"github.com/google/uuid"
-	"github.com/nuominmin/biz/krs/authorization"
-)
-
-const (
-	// default context key for token
-	defaultContextKey string = "token"
 )
 
 type Service interface {
@@ -28,7 +24,7 @@ type service struct {
 
 func NewService() Service {
 	return &service{
-		contextKey: defaultContextKey,
+		contextKey: constant.DefaultTokenContextKey,
 	}
 }
 
@@ -59,19 +55,19 @@ func (s *service) Middleware(ignoredPaths []string, m ...middleware.Middleware) 
 					}
 				}
 
-				authHeader := tr.RequestHeader().Get(authorization.HeaderAuthorizationKey)
+				authHeader := tr.RequestHeader().Get(constant.HeaderAuthorizationKey)
 				if authHeader == "" {
-					return nil, authorization.NewAuthorizationError(authorization.ErrMissingToken)
+					return nil, errresp.NewAuthorizationError(constant.ErrMissingToken)
 				}
 
 				parts := strings.SplitN(authHeader, " ", 2)
-				if len(parts) != 2 || parts[0] != authorization.AuthorizationValueBearer {
-					return nil, authorization.NewAuthorizationError(authorization.ErrInvalidToken)
+				if len(parts) != 2 || parts[0] != constant.AuthorizationValueBearer {
+					return nil, errresp.NewAuthorizationError(constant.ErrInvalidToken)
 				}
 
 				tokenString = parts[1]
 			} else {
-				return nil, authorization.NewAuthorizationError(authorization.ErrMissingToken)
+				return nil, errresp.NewAuthorizationError(constant.ErrMissingToken)
 			}
 
 			// 将 token 信息传递给 handler
@@ -94,5 +90,5 @@ func (s *service) GetToken(ctx context.Context) (string, error) {
 	if token, ok := ctx.Value(s.contextKey).(string); ok {
 		return token, nil
 	}
-	return "", errors.New("failed to token from context")
+	return "", errors.New("failed to get token from context")
 }

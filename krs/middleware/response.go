@@ -1,8 +1,11 @@
 package middleware
 
 import (
+	"log"
 	"net/http"
 	"time"
+
+	"github.com/nuominmin/biz/krs/middleware/types"
 
 	"github.com/go-kratos/kratos/v2/encoding"
 	"github.com/spf13/cast"
@@ -10,30 +13,51 @@ import (
 	transporthttp "github.com/go-kratos/kratos/v2/transport/http"
 )
 
-// Response define standard response format
-type Response struct {
-	Code    int         `json:"code"`
-	Message string      `json:"message,omitempty"`
-	Data    interface{} `json:"data,omitempty"`
-	Ts      string      `json:"ts"`
-}
-
 // ResponseServerOption .
 func ResponseServerOption() transporthttp.ServerOption {
 	return transporthttp.ResponseEncoder(func(w http.ResponseWriter, r *http.Request, i interface{}) error {
-		var nCode int
-		if code := w.Header().Get("code"); code != "" {
-			nCode = cast.ToInt(code)
-		}
-
-		reply := &Response{
-			Code: nCode,
-			Data: i,
-			Ts:   time.Now().Format(time.RFC3339),
-		}
-		data, _ := encoding.GetCodec("json").Marshal(reply)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(data)
-		return nil
+		return handleJSONResponse(w, r, i)
 	})
+}
+
+// handleJSONResponse 处理标准JSON响应
+func handleJSONResponse(w http.ResponseWriter, r *http.Request, i interface{}) error {
+	var nCode int
+	if code := w.Header().Get("code"); code != "" {
+		nCode = cast.ToInt(code)
+	}
+
+	reply := &types.Response{
+		Code:    nCode,
+		Data:    i,
+		Success: nCode == 0, // 0表示成功
+		Ts:      time.Now().Format(time.RFC3339),
+	}
+
+	// 添加请求ID（如果存在）
+	if requestID := r.Header.Get("X-Request-ID"); requestID != "" {
+		reply.RequestID = requestID
+	}
+
+	data, err := encoding.GetCodec("json").Marshal(reply)
+	if err != nil {
+		log.Printf("Failed to marshal JSON response: %v", err)
+		errorResponse := types.NewErrorResponse(500, "Internal server error")
+		if requestID := r.Header.Get("X-Request-ID"); requestID != "" {
+			errorResponse.RequestID = requestID
+		}
+		errorData, _ := encoding.GetCodec("json").Marshal(errorResponse)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write(errorData)
+		return err
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	// 根据业务错误码设置HTTP状态码
+	if nCode != 0 {
+		w.WriteHeader(http.StatusBadRequest)
+	}
+	_, _ = w.Write(data)
+	return nil
 }
