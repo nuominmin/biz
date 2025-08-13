@@ -19,7 +19,7 @@ const (
 	DEFAULT_SOURCE = "1234567890"
 )
 
-type Options struct {
+type options struct {
 	height          int
 	width           int
 	length          int
@@ -31,10 +31,10 @@ type Options struct {
 	fontsStorage    cp.FontsStorage
 }
 
-type Option func(*Options)
+type Option func(*options)
 
-func newOptions(opts ...Option) Options {
-	options := Options{
+func newOptions(optFns ...Option) options {
+	opts := options{
 		height:          DEFAULT_HEIGHT,
 		width:           DEFAULT_WIDTH,
 		length:          DEFAULT_LENGTH,
@@ -45,71 +45,71 @@ func newOptions(opts ...Option) Options {
 		bgColor:         &color.RGBA{0, 0, 0, 0},
 		fontsStorage:    cp.DefaultEmbeddedFonts,
 	}
-	for _, opt := range opts {
-		opt(&options)
+	for _, opt := range optFns {
+		opt(&opts)
 	}
-	return options
+	return opts
 }
 
 // 设置高度
 func WithHeight(height int) Option {
-	return func(p *Options) {
+	return func(p *options) {
 		p.height = height
 	}
 }
 
 // 设置宽度
 func WithWidth(width int) Option {
-	return func(p *Options) {
+	return func(p *options) {
 		p.width = width
 	}
 }
 
 // 设置长度
 func WithLength(length int) Option {
-	return func(p *Options) {
+	return func(p *options) {
 		p.length = length
 	}
 }
 
 // 设置字体
 func WithSource(source string) Option {
-	return func(p *Options) {
+	return func(p *options) {
 		p.source = source
 	}
 }
 
 // 设置源
 func WithFonts(fonts ...string) Option {
-	return func(p *Options) {
+	return func(p *options) {
 		p.fonts = fonts
 	}
 }
 
 // 设置噪声计数
 func WithNoiseCount(noiseCount int) Option {
-	return func(p *Options) {
+	return func(p *options) {
 		p.noiseCount = noiseCount
 	}
 }
 
 // 设置背景颜色
 func WithBgColor(bgColor *color.RGBA) Option {
-	return func(p *Options) {
+	return func(p *options) {
 		p.bgColor = bgColor
 	}
 }
 
 // 显示空心线
 func WithShowHollowLine() Option {
-	return func(p *Options) {
+	return func(p *options) {
 		p.showLineOptions = cp.OptionShowHollowLine
 	}
 }
 
 // 显示黏液线
 func WithShowSlimeLine() Option {
-	return func(p *Options) {
+	return func(p *options) {
 		p.showLineOptions = cp.OptionShowSlimeLine
 	}
 
@@ -117,14 +117,14 @@ func WithShowSlimeLine() Option {
 
 // 显示正弦线
 func WithShowSineLine() Option {
-	return func(p *Options) {
+	return func(p *options) {
 		p.showLineOptions = cp.OptionShowSineLine
 	}
 }
 
 // 设置文件仓储
 func WithFontStorage(fontsStorage cp.FontsStorage) Option {
-	return func(p *Options) {
+	return func(p *options) {
 		p.fontsStorage = fontsStorage
 	}
 }

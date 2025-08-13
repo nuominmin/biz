@@ -14,18 +14,18 @@ type captcha struct {
 }
 
 // 创建字符串验证码实例
-func NewCaptcha(opts ...Option) Service {
-	options := newOptions(opts...)
+func NewCaptcha(optFns ...Option) Service {
+	opts := newOptions(optFns...)
 	driver := cp.NewDriverString(
-		options.height,
-		options.width,
-		options.noiseCount,
-		options.showLineOptions,
-		options.length,
-		options.source,
-		options.bgColor,
-		options.fontsStorage,
-		options.fonts,
+		opts.height,
+		opts.width,
+		opts.noiseCount,
+		opts.showLineOptions,
+		opts.length,
+		opts.source,
+		opts.bgColor,
+		opts.fontsStorage,
+		opts.fonts,
 	)
 	return &captcha{cp.NewCaptcha(driver, cp.DefaultMemStore)}
 }
