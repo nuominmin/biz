@@ -2,9 +2,16 @@
 
 ## 例子
 ```go
-func NewOss() oss.Service {
-	return oss.NewOss()
+func NewOss(data *conf.Data) (oss.Service, error) {
+    return oss.NewOss(
+        oss.WithEndpoint(data.Oss.Endpoint),
+        oss.WithAccessKeyId(data.Oss.AccessKeyId),
+        oss.WithAccessKeySecret(data.Oss.AccessKeySecret),
+        oss.WithBucketName(data.Oss.BucketName),
+        oss.WithBaseUrl(data.Oss.BaseUrl),
+    )
 }
+
 
 // 上传文件
 filename := ossSvc.GenerateUniqueFilepath("goods", handler.Filename)

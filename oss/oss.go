@@ -3,16 +3,18 @@ package oss
 import (
 	"errors"
 	"fmt"
-	"github.com/aliyun/aliyun-oss-go-sdk/oss"
-	"github.com/google/uuid"
 	"io"
 	"mime"
+	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/aliyun/aliyun-oss-go-sdk/oss"
+	"github.com/google/uuid"
 )
 
 type Service interface {
-	GenerateUniqueFilepath(dir, originalFilename string) string 
+	GenerateUniqueFilepath(dir, originalFilename string) string
 	UploadFile(reader io.Reader, originalFilename string) (string, error)
 	DownloadFile(filename string) (io.ReadCloser, error)
 	DeleteFile(filename string) error
@@ -150,7 +152,10 @@ func (s *service) GenerateUniqueFilepath(dir, originalFilename string) string {
 	filename := fmt.Sprintf("%s%s", name, ext)
 
 	if dir != "" {
-		return filepath.Join(dir, filename)
+		// 归一化目录分隔符并使用 URL 风格路径拼接，避免 Windows 下反斜杠导致的对象 Key/URL 异常
+		cleanDir := strings.ReplaceAll(dir, "\\", "/")
+		key := path.Join(cleanDir, filename)
+		return strings.TrimLeft(key, "/")
 	}
 	return filename
 }
