@@ -18,6 +18,17 @@ type Service interface {
 	UploadFile(reader io.Reader, originalFilename string) (string, error)
 	DownloadFile(filename string) (io.ReadCloser, error)
 	DeleteFile(filename string) error
+
+	SetBucketCORS(rules ...oss.CORSRule) error
+}
+
+// 默认CORS规则
+var defaultCorsRule = oss.CORSRule{
+	AllowedOrigin: []string{"*"},
+	AllowedMethod: []string{"GET", "HEAD"},
+	AllowedHeader: []string{"*"},
+	ExposeHeader:  []string{"ETag", "Content-Length", "Content-Type"},
+	MaxAgeSeconds: 86400,
 }
 
 type service struct {
@@ -199,4 +210,34 @@ func (s *service) getContentType(filename string) string {
 	default:
 		return "application/octet-stream"
 	}
+}
+
+/*
+SetBucketCORS 设置CORS配置
+
+例子：
+
+	var rule1 = oos.CORSRule{
+		AllowedOrigin: []string{"*"},
+		AllowedMethod: []string{"GET", "HEAD"},
+		AllowedHeader: []string{"*"},
+		ExposeHeader:  []string{"ETag", "Content-Length", "Content-Type"},
+		MaxAgeSeconds: 86400,
+	}
+
+	var rule2 = oos.CORSRule{
+		AllowedOrigin: []string{"http://www.a.com", "http://www.b.com"},
+		AllowedMethod: []string{"GET"},
+		AllowedHeader: []string{"Authorization"},
+		ExposeHeader:  []string{"x-oss-test", "x-oss-test1"},
+		MaxAgeSeconds: 200,
+	}
+*/
+func (s *service) SetBucketCORS(rules ...oss.CORSRule) error {
+	// 为空使用默认的
+	if len(rules) == 0 {
+		rules = append(rules, defaultCorsRule)
+	}
+
+	return s.client.SetBucketCORS(s.bucket.BucketName, rules)
 }
