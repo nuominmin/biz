@@ -14,6 +14,8 @@ import (
 type OssService interface {
 	Service
 	SetBucketCORS(rules ...oss.CORSRule) error
+	RemoveDomainFromURL(fullURL string) string
+	AddDomainToURL(relativePath string) string
 }
 
 // 默认CORS规则
