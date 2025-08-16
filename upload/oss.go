@@ -1,24 +1,18 @@
-package oss
+package upload
 
 import (
 	"errors"
 	"fmt"
 	"io"
-	"mime"
-	"path"
-	"path/filepath"
+	"net/url"
 	"strings"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
-	"github.com/google/uuid"
 )
 
-type Service interface {
-	GenerateUniqueFilepath(dir, originalFilename string) string
-	UploadFile(reader io.Reader, originalFilename string) (string, error)
-	DownloadFile(filename string) (io.ReadCloser, error)
-	DeleteFile(filename string) error
-
+// OssService 是OSS服务的接口
+type OssService interface {
+	Service
 	SetBucketCORS(rules ...oss.CORSRule) error
 }
 
@@ -31,42 +25,42 @@ var defaultCorsRule = oss.CORSRule{
 	MaxAgeSeconds: 86400,
 }
 
-type service struct {
-	opts   options
+type ossService struct {
+	*service
 	client *oss.Client
 	bucket *oss.Bucket
 }
 
-func NewOss(optFns ...Option) (Service, error) {
-	opts := newOptions(optFns...)
+func NewOssService(optFns ...Option) (OssService, error) {
+	ossSvc := &ossService{
+		service: newService(optFns...),
+	}
 
 	// 验证OSS配置的完整性
-	err := validateOSSConfig(opts)
+	err := ossSvc.validateOSSConfig(ossSvc.opts)
 	if err != nil {
 		return nil, err
 	}
 
 	// 创建OSS客户端
-	client, err := oss.New(opts.endpoint, opts.accessKeyId, opts.accessKeySecret)
+	client, err := oss.New(ossSvc.opts.endpoint, ossSvc.opts.accessKeyId, ossSvc.opts.accessKeySecret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create OSS client: %v", err)
 	}
+	ossSvc.client = client
 
 	// 获取存储桶
-	bucket, err := client.Bucket(opts.bucketName)
+	bucket, err := client.Bucket(ossSvc.opts.bucketName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get OSS bucket '%s': %v", opts.bucketName, err)
+		return nil, fmt.Errorf("failed to get OSS bucket '%s': %v", ossSvc.opts.bucketName, err)
 	}
+	ossSvc.bucket = bucket
 
-	return &service{
-		opts:   opts,
-		client: client,
-		bucket: bucket,
-	}, nil
+	return ossSvc, nil
 }
 
 // 验证OSS配置的完整性
-func validateOSSConfig(opts options) error {
+func (s *ossService) validateOSSConfig(opts options) error {
 	if opts.endpoint == "" {
 		return fmt.Errorf("endpoint is required")
 	}
@@ -92,7 +86,10 @@ func validateOSSConfig(opts options) error {
 }
 
 // UploadFile 上传文件到OSS或本地存储
-func (s *service) UploadFile(reader io.Reader, filename string) (string, error) {
+func (s *ossService) UploadFile(reader io.Reader, dir, name string) (string, error) {
+	// 拼接文件路径
+	filename := s.joinPath(dir, name)
+
 	// 设置上传选项
 	opts := []oss.Option{
 		oss.ContentType(s.getContentType(filename)),
@@ -136,7 +133,7 @@ func (s *service) UploadFile(reader io.Reader, filename string) (string, error) 
 }
 
 // DownloadFile 从OSS下载文件
-func (s *service) DownloadFile(filename string) (io.ReadCloser, error) {
+func (s *ossService) DownloadFile(filename string) (io.ReadCloser, error) {
 	// 从OSS获取文件
 	reader, err := s.bucket.GetObject(filename)
 	if err != nil {
@@ -146,70 +143,12 @@ func (s *service) DownloadFile(filename string) (io.ReadCloser, error) {
 }
 
 // DeleteFile 从OSS删除文件
-func (s *service) DeleteFile(filename string) error {
+func (s *ossService) DeleteFile(filename string) error {
 	err := s.bucket.DeleteObject(filename)
 	if err != nil {
 		return fmt.Errorf("failed to delete file from OSS: %v", err)
 	}
 	return nil
-}
-
-// GenerateUniqueFilepath 生成唯一文件路径（带目录）
-// dir: 目标目录（可以为空）
-// originalFilename: 原文件名，用于提取扩展名
-func (s *service) GenerateUniqueFilepath(dir, originalFilename string) string {
-	ext := filepath.Ext(originalFilename)
-	name := strings.ReplaceAll(uuid.New().String(), "-", "")
-	filename := fmt.Sprintf("%s%s", name, ext)
-
-	if dir != "" {
-		// 归一化目录分隔符并使用 URL 风格路径拼接，避免 Windows 下反斜杠导致的对象 Key/URL 异常
-		cleanDir := strings.ReplaceAll(dir, "\\", "/")
-		key := path.Join(cleanDir, filename)
-		return strings.TrimLeft(key, "/")
-	}
-	return filename
-}
-
-// getContentType 根据文件扩展名获取MIME类型
-func (s *service) getContentType(filename string) string {
-	ext := strings.ToLower(filepath.Ext(filename))
-
-	// 首先尝试标准MIME类型
-	if mimeType := mime.TypeByExtension(ext); mimeType != "" {
-		return mimeType
-	}
-
-	// 为3D模型文件设置特定的MIME类型
-	switch ext {
-	case ".fbx":
-		return "model/fbx" // 更具体的 MIME 类型，有助于浏览器识别
-	case ".obj":
-		return "model/obj"
-	case ".dae":
-		return "model/vnd.collada+xml"
-	case ".gltf":
-		return "model/gltf+json"
-	case ".glb":
-		return "model/gltf-binary"
-	case ".3ds":
-		return "model/3ds"
-	case ".blend":
-		return "application/x-blender"
-	case ".max":
-		return "application/x-3dsmax"
-	case ".ma", ".mb":
-		return "application/x-maya"
-	// 视频文件
-	case ".mp4":
-		return "video/mp4"
-	case ".avi":
-		return "video/x-msvideo"
-	case ".mov":
-		return "video/quicktime"
-	default:
-		return "application/octet-stream"
-	}
 }
 
 /*
@@ -233,11 +172,76 @@ SetBucketCORS 设置CORS配置
 		MaxAgeSeconds: 200,
 	}
 */
-func (s *service) SetBucketCORS(rules ...oss.CORSRule) error {
+func (s *ossService) SetBucketCORS(rules ...oss.CORSRule) error {
 	// 为空使用默认的
 	if len(rules) == 0 {
 		rules = append(rules, defaultCorsRule)
 	}
 
 	return s.client.SetBucketCORS(s.bucket.BucketName, rules)
+}
+
+// RemoveDomainFromURL 从URL中移除域名，只保留路径部分
+func (s *ossService) RemoveDomainFromURL(fullURL string) string {
+	if fullURL == "" {
+		return ""
+	}
+
+	// 如果已经是相对路径，直接返回
+	if !strings.HasPrefix(fullURL, "http://") && !strings.HasPrefix(fullURL, "https://") {
+		return fullURL
+	}
+
+	// 解析URL
+	parsedURL, err := url.Parse(fullURL)
+	if err != nil {
+		// 如果解析失败，返回原URL
+		return fullURL
+	}
+
+	// 检查是否是OSS域名或本地域名
+	host := parsedURL.Host
+	isOSSDomain := strings.Contains(s.opts.baseUrl, host)
+	isLocalDomain := strings.HasPrefix(fullURL, "http://127.0.0.1") || strings.HasPrefix(fullURL, "http://localhost")
+
+	if isOSSDomain || isLocalDomain {
+		// 返回路径部分（包括查询参数和片段）
+		path := parsedURL.Path
+		if parsedURL.RawQuery != "" {
+			path += "?" + parsedURL.RawQuery
+		}
+		if parsedURL.Fragment != "" {
+			path += "#" + parsedURL.Fragment
+		}
+		return path
+	}
+
+	// 如果不是已知域名，保留原URL
+	return fullURL
+}
+
+// AddDomainToURL 为相对路径添加域名
+func (s *ossService) AddDomainToURL(relativePath string) string {
+	if relativePath == "" {
+		return ""
+	}
+
+	// 如果已经是完整URL，直接返回
+	if strings.HasPrefix(relativePath, "http://") || strings.HasPrefix(relativePath, "https://") {
+		return relativePath
+	}
+
+	// 确保路径以 / 开头
+	if !strings.HasPrefix(relativePath, "/") {
+		relativePath = "/" + relativePath
+	}
+
+	// 如果启用了OSS，使用OSS的base_url
+	if s.opts.baseUrl != "" {
+		baseURL := strings.TrimRight(s.opts.baseUrl, "/")
+		return baseURL + relativePath
+	}
+
+	// 否则使用本地路径（由前端处理域名拼接）
+	return relativePath
 }
