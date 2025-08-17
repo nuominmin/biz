@@ -20,14 +20,14 @@ func newOptions(opts ...Option) Options {
 
 // 设置每页数量默认值
 func WithDefaultPageSize(pageSize uint) Option {
-	return func(p *Options) {
-		p.defaultPageSize = pageSize
+	return func(o *Options) {
+		o.defaultPageSize = pageSize
 	}
 }
 
 // 设置每页数量最大值
 func WithMaxPageSize(pageSize uint) Option {
-	return func(p *Options) {
-		p.maxPageSize = pageSize
+	return func(o *Options) {
+		o.maxPageSize = pageSize
 	}
 }

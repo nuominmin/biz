@@ -30,11 +30,11 @@ func newOptions(optFns ...Option) options {
 
 // 设置 OSS 配置
 func WithOssConfig(endpoint, accessKeyId, accessKeySecret, bucketName, baseUrl string) Option {
-	return func(p *options) {
-		p.endpoint = endpoint
-		p.accessKeyId = accessKeyId
-		p.accessKeySecret = accessKeySecret
-		p.bucketName = bucketName
-		p.baseUrl = baseUrl
+	return func(o *options) {
+		o.endpoint = endpoint
+		o.accessKeyId = accessKeyId
+		o.accessKeySecret = accessKeySecret
+		o.bucketName = bucketName
+		o.baseUrl = baseUrl
 	}
 }

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/nuominmin/biz/krs/middleware/types"
+	"github.com/nuominmin/biz/krs/types"
 
 	"github.com/go-kratos/kratos/v2/encoding"
 	"github.com/spf13/cast"
@@ -28,24 +28,15 @@ func handleJSONResponse(w http.ResponseWriter, r *http.Request, i interface{}) e
 	}
 
 	reply := &types.Response{
-		Code:    nCode,
-		Data:    i,
-		Success: nCode == 0, // 0表示成功
-		Ts:      time.Now().Format(time.RFC3339),
-	}
-
-	// 添加请求ID（如果存在）
-	if requestID := r.Header.Get("X-Request-ID"); requestID != "" {
-		reply.RequestID = requestID
+		Code: nCode,
+		Data: i,
+		Ts:   time.Now().Format(time.RFC3339),
 	}
 
 	data, err := encoding.GetCodec("json").Marshal(reply)
 	if err != nil {
 		log.Printf("Failed to marshal JSON response: %v", err)
 		errorResponse := types.NewErrorResponse(500, "Internal server error")
-		if requestID := r.Header.Get("X-Request-ID"); requestID != "" {
-			errorResponse.RequestID = requestID
-		}
 		errorData, _ := encoding.GetCodec("json").Marshal(errorResponse)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)

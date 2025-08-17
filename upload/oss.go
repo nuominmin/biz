@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/url"
+	"path"
 	"strings"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
@@ -14,8 +14,6 @@ import (
 type OssService interface {
 	Service
 	SetBucketCORS(rules ...oss.CORSRule) error
-	RemoveDomainFromURL(fullURL string) string
-	AddDomainToURL(relativePath string) string
 }
 
 // 默认CORS规则
@@ -33,9 +31,9 @@ type ossService struct {
 	bucket *oss.Bucket
 }
 
-func NewOssService(optFns ...Option) (OssService, error) {
+func NewOssService(host, dir string, optFns ...Option) (OssService, error) {
 	ossSvc := &ossService{
-		service: newService(optFns...),
+		service: newService(host, dir, optFns...),
 	}
 
 	// 验证OSS配置的完整性
@@ -88,13 +86,13 @@ func (s *ossService) validateOSSConfig(opts options) error {
 }
 
 // UploadFile 上传文件到OSS或本地存储
-func (s *ossService) UploadFile(reader io.Reader, dir, name string) (string, error) {
+func (s *ossService) UploadFile(reader io.Reader, name string) (string, error) {
 	// 拼接文件路径
-	filename := s.joinPath(dir, name)
+	filename := s.joinPath(s.dir, name)
 
 	// 设置上传选项
 	opts := []oss.Option{
-		oss.ContentType(s.getContentType(filename)),
+		oss.ContentType(s.GetContentType(filename)),
 		oss.ObjectACL(oss.ACLPublicRead), // 设置为公共读
 		// 添加缓存控制，允许浏览器缓存
 		oss.CacheControl("public, max-age=31536000"), // 1年缓存
@@ -129,19 +127,25 @@ func (s *ossService) UploadFile(reader io.Reader, dir, name string) (string, err
 		return "", fmt.Errorf("failed to upload file to OSS: %v", err)
 	}
 
-	// 返回文件的公网访问URL
-	fileURL := fmt.Sprintf("%s/%s", strings.TrimRight(s.opts.baseUrl, "/"), filename)
-	return fileURL, nil
+	// 确保 filename 里用的是 /
+	filename = path.Clean(strings.ReplaceAll(filename, "\\", "/"))
+
+	return fmt.Sprintf("%s/%s", s.host, filename), nil
 }
 
 // DownloadFile 从OSS下载文件
-func (s *ossService) DownloadFile(filename string) (io.ReadCloser, error) {
+func (s *ossService) DownloadFile(filename string) ([]byte, error) {
 	// 从OSS获取文件
 	reader, err := s.bucket.GetObject(filename)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download file from OSS: %v", err)
 	}
-	return reader, nil
+
+	var data []byte
+	if data, err = io.ReadAll(reader); err != nil {
+		return nil, fmt.Errorf("failed to read file from OSS: %v", err)
+	}
+	return data, nil
 }
 
 // DeleteFile 从OSS删除文件
@@ -181,69 +185,4 @@ func (s *ossService) SetBucketCORS(rules ...oss.CORSRule) error {
 	}
 
 	return s.client.SetBucketCORS(s.bucket.BucketName, rules)
-}
-
-// RemoveDomainFromURL 从URL中移除域名，只保留路径部分
-func (s *ossService) RemoveDomainFromURL(fullURL string) string {
-	if fullURL == "" {
-		return ""
-	}
-
-	// 如果已经是相对路径，直接返回
-	if !strings.HasPrefix(fullURL, "http://") && !strings.HasPrefix(fullURL, "https://") {
-		return fullURL
-	}
-
-	// 解析URL
-	parsedURL, err := url.Parse(fullURL)
-	if err != nil {
-		// 如果解析失败，返回原URL
-		return fullURL
-	}
-
-	// 检查是否是OSS域名或本地域名
-	host := parsedURL.Host
-	isOSSDomain := strings.Contains(s.opts.baseUrl, host)
-	isLocalDomain := strings.HasPrefix(fullURL, "http://127.0.0.1") || strings.HasPrefix(fullURL, "http://localhost")
-
-	if isOSSDomain || isLocalDomain {
-		// 返回路径部分（包括查询参数和片段）
-		path := parsedURL.Path
-		if parsedURL.RawQuery != "" {
-			path += "?" + parsedURL.RawQuery
-		}
-		if parsedURL.Fragment != "" {
-			path += "#" + parsedURL.Fragment
-		}
-		return path
-	}
-
-	// 如果不是已知域名，保留原URL
-	return fullURL
-}
-
-// AddDomainToURL 为相对路径添加域名
-func (s *ossService) AddDomainToURL(relativePath string) string {
-	if relativePath == "" {
-		return ""
-	}
-
-	// 如果已经是完整URL，直接返回
-	if strings.HasPrefix(relativePath, "http://") || strings.HasPrefix(relativePath, "https://") {
-		return relativePath
-	}
-
-	// 确保路径以 / 开头
-	if !strings.HasPrefix(relativePath, "/") {
-		relativePath = "/" + relativePath
-	}
-
-	// 如果启用了OSS，使用OSS的base_url
-	if s.opts.baseUrl != "" {
-		baseURL := strings.TrimRight(s.opts.baseUrl, "/")
-		return baseURL + relativePath
-	}
-
-	// 否则使用本地路径（由前端处理域名拼接）
-	return relativePath
 }

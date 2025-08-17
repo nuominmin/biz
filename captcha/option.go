@@ -8,15 +8,15 @@ import (
 
 const (
 	// 默认高度
-	DEFAULT_HEIGHT = 60
+	defaultHeight = 60
 	// 默认宽度
-	DEFAULT_WIDTH = 240
+	defaultWidth = 240
 	// 默认长度
-	DEFAULT_LENGTH = 4
+	defaultLength = 4
 	// 默认字体
-	DEFAULT_FONT = "Flim-Flam.ttf"
+	defaultFont = "Flim-Flam.ttf"
 	// 默认源
-	DEFAULT_SOURCE = "1234567890"
+	defaultSource = "1234567890"
 )
 
 type options struct {
@@ -35,14 +35,14 @@ type Option func(*options)
 
 func newOptions(optFns ...Option) options {
 	opts := options{
-		height:          DEFAULT_HEIGHT,
-		width:           DEFAULT_WIDTH,
-		length:          DEFAULT_LENGTH,
+		height:          defaultHeight,
+		width:           defaultWidth,
+		length:          defaultLength,
 		noiseCount:      0,
 		showLineOptions: cp.OptionShowHollowLine,
-		fonts:           []string{DEFAULT_FONT},
-		source:          DEFAULT_SOURCE,
-		bgColor:         &color.RGBA{0, 0, 0, 0},
+		fonts:           []string{defaultFont},
+		source:          defaultSource,
+		bgColor:         &color.RGBA{},
 		fontsStorage:    cp.DefaultEmbeddedFonts,
 	}
 	for _, opt := range optFns {
@@ -53,78 +53,78 @@ func newOptions(optFns ...Option) options {
 
 // 设置高度
 func WithHeight(height int) Option {
-	return func(p *options) {
-		p.height = height
+	return func(o *options) {
+		o.height = height
 	}
 }
 
 // 设置宽度
 func WithWidth(width int) Option {
-	return func(p *options) {
-		p.width = width
+	return func(o *options) {
+		o.width = width
 	}
 }
 
 // 设置长度
 func WithLength(length int) Option {
-	return func(p *options) {
-		p.length = length
+	return func(o *options) {
+		o.length = length
 	}
 }
 
 // 设置字体
 func WithSource(source string) Option {
-	return func(p *options) {
-		p.source = source
+	return func(o *options) {
+		o.source = source
 	}
 }
 
 // 设置源
 func WithFonts(fonts ...string) Option {
-	return func(p *options) {
-		p.fonts = fonts
+	return func(o *options) {
+		o.fonts = fonts
 	}
 }
 
 // 设置噪声计数
 func WithNoiseCount(noiseCount int) Option {
-	return func(p *options) {
-		p.noiseCount = noiseCount
+	return func(o *options) {
+		o.noiseCount = noiseCount
 	}
 }
 
 // 设置背景颜色
 func WithBgColor(bgColor *color.RGBA) Option {
-	return func(p *options) {
-		p.bgColor = bgColor
+	return func(o *options) {
+		o.bgColor = bgColor
 	}
 }
 
 // 显示空心线
 func WithShowHollowLine() Option {
-	return func(p *options) {
-		p.showLineOptions = cp.OptionShowHollowLine
+	return func(o *options) {
+		o.showLineOptions = cp.OptionShowHollowLine
 	}
 }
 
 // 显示黏液线
 func WithShowSlimeLine() Option {
-	return func(p *options) {
-		p.showLineOptions = cp.OptionShowSlimeLine
+	return func(o *options) {
+		o.showLineOptions = cp.OptionShowSlimeLine
 	}
 
 }
 
 // 显示正弦线
 func WithShowSineLine() Option {
-	return func(p *options) {
-		p.showLineOptions = cp.OptionShowSineLine
+	return func(o *options) {
+		o.showLineOptions = cp.OptionShowSineLine
 	}
 }
 
 // 设置文件仓储
 func WithFontStorage(fontsStorage cp.FontsStorage) Option {
-	return func(p *options) {
-		p.fontsStorage = fontsStorage
+	return func(o *options) {
+		o.fontsStorage = fontsStorage
 	}
 }
